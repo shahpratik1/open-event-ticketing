@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Guest Directory & Gate Entry</title>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+    body { margin: 0; padding: 0; background: #0b0f19; color: #f8fafc; padding-bottom: 30px; }
+    
+    /* Header */
+    .top-bar { background: #161e2e; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #283548; position: sticky; top: 0; z-index: 50; }
+    .top-bar h1 { margin: 0; font-size: 18px; font-weight: 800; color: #38bdf8; display: flex; align-items: center; gap: 10px; }
+    
+    /* Refresh Button */
+    .btn-sync { background: #283548; color: #f8fafc; border: none; width: 32px; height: 32px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 14px; cursor: pointer; transition: transform 0.2s; }
+    .btn-sync:active { transform: rotate(180deg); background: #38bdf8; color: #0b0f19; }
+
+    .stats-pill { background: #0284c7; padding: 5px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+
+    /* Main Container */
+    .content-wrap { max-width: 600px; margin: 0 auto; padding: 16px; }
+
+    /* Directory Search & Filters */
+    .search-input { width: 100%; padding: 14px 16px; border-radius: 12px; border: 2px solid #334155; background: #161e2e; color: #fff; font-size: 16px; outline: none; margin-bottom: 14px; transition: border-color 0.2s; }
+    .search-input:focus { border-color: #38bdf8; }
+    
+    .filter-pills { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 14px; scrollbar-width: none; }
+    .filter-pills::-webkit-scrollbar { display: none; }
+    .pill { white-space: nowrap; padding: 8px 14px; border-radius: 20px; font-size: 13px; font-weight: 700; background: #161e2e; border: 1px solid #334155; color: #94a3b8; cursor: pointer; transition: all 0.2s; }
+    .pill.active { background: #0284c7; color: #fff; border-color: #38bdf8; }
+
+    /* Directory Cards */
+    .guest-card { background: #161e2e; border: 1px solid #283548; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: 0.1s; }
+    .guest-card:active { transform: scale(0.98); background: #1e293b; border-color: #38bdf8; }
+    .guest-card.canceled-card { opacity: 0.55; border-color: #ef4444; }
+    
+    .guest-main { flex: 1; overflow: hidden; padding-right: 12px; }
+    .guest-name { font-size: 17px; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+    .guest-code { font-family: monospace; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+    .guest-breakdown { font-size: 12px; color: #cbd5e1; display: flex; gap: 10px; font-weight: 500; }
+    .guest-meta { text-align: right; }
+
+    /* Status Badges */
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; }
+    .badge-paid { background: #14532d; color: #86efac; }
+    .badge-unpaid { background: #7f1d1d; color: #fca5a5; }
+    .badge-checked { background: #0369a1; color: #bae6fd; }
+    .badge-partial { background: #854d0e; color: #fef08a; }
+    .badge-canceled { background: #991b1b; color: #fff; }
+
+    /* Check-In Modal / Bottom Sheet */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 99; backdrop-filter: blur(4px); }
+    .card { display: none; position: fixed; bottom: 0; left: 0; right: 0; max-width: 600px; margin: 0 auto; background: #161e2e; border-radius: 24px 24px 0 0; padding: 24px; z-index: 100; border-top: 3px solid #38bdf8; max-height: 92vh; overflow-y: auto; box-shadow: 0 -8px 25px rgba(0,0,0,0.6); }
+    
+    .cancel-banner { display: none; background: #dc2626; color: #fff; padding: 14px; border-radius: 12px; margin-bottom: 16px; text-align: center; border: 2px solid #ef4444; }
+    .cancel-banner h3 { margin: 0 0 4px 0; font-size: 17px; font-weight: 900; }
+    .cancel-banner p { margin: 0; font-size: 13px; }
+
+    .attendee-name { font-size: 24px; font-weight: 800; margin: 0 0 4px 0; color: #fff; }
+    .ticket-code { font-family: monospace; color: #94a3b8; font-size: 15px; margin-bottom: 16px; word-break: break-all; }
+
+    /* Steppers */
+    .stepper-row { display: flex; justify-content: space-between; align-items: center; background: #0b0f19; padding: 14px 16px; border-radius: 14px; margin-bottom: 12px; border: 1px solid #283548; }
+    .stepper-info .label { font-size: 16px; font-weight: 700; color: #f1f5f9; }
+    .stepper-info .sub { font-size: 13px; color: #94a3b8; margin-top: 4px; }
+    .stepper-controls { display: flex; align-items: center; gap: 14px; }
+    .btn-step { width: 42px; height: 42px; border-radius: 50%; border: none; background: #283548; color: #fff; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.1s; }
+    .btn-step:active { background: #38bdf8; color: #000; }
+    .btn-step:disabled { opacity: 0.3; cursor: not-allowed; }
+    .step-val { font-size: 20px; font-weight: 800; width: 28px; text-align: center; }
+
+    /* Action Buttons */
+    .btn-submit { width: 100%; background: #22c55e; color: #052e16; font-size: 17px; font-weight: 900; padding: 16px; border-radius: 14px; border: none; margin-top: 14px; cursor: pointer; letter-spacing: 0.5px; }
+    .btn-submit:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-submit.btn-denied { background: #dc2626 !important; color: #fff !important; opacity: 1 !important; }
+    .btn-cancel { width: 100%; background: transparent; color: #94a3b8; font-size: 16px; font-weight: 600; padding: 14px; border: none; margin-top: 6px; cursor: pointer; }
+
+    /* Toast Notification */
+    .toast { position: fixed; top: 75px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #052e16; padding: 14px 24px; border-radius: 30px; font-weight: 800; font-size: 14px; display: none; z-index: 200; box-shadow: 0 6px 18px rgba(0,0,0,0.6); text-align: center; max-width: 90%; }
+    .toast-err { background: #ef4444; color: #fff; }
+
+    .empty-state { text-align: center; color: #64748b; padding: 40px 16px; font-size: 15px; line-height: 1.5; }
+    .spinner { display: inline-block; width: 30px; height: 30px; border: 3px solid rgba(255,255,255,0.1); border-radius: 50%; border-top-color: #38bdf8; animation: spin 1s ease-in-out infinite; margin-bottom: 12px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <h1>
+      🎪 Gate Entry
+      <button class="btn-sync" onclick="forceSync()" title="Refresh Data">🔄</button>
+    </h1>
+    <div class="stats-pill" id="liveStats">Checked: -- / --</div>
+  </div>
+
+  <!-- Main Directory UI -->
+  <div class="content-wrap">
+    
+    <input type="text" class="search-input" id="dirSearch" placeholder="🔍 Search by guest name or ticket code..." oninput="filterDirectory()" autocorrect="off" autocomplete="off" />
+
+    <!-- Enhanced Filter Pills with Dynamic Counts -->
+    <div class="filter-pills">
+      <div class="pill active" onclick="setFilter('all', this)">All (<span id="c_all">0</span>)</div>
+      <div class="pill" onclick="setFilter('not_checked', this)">Pending (<span id="c_pending">0</span>)</div>
+      <div class="pill" onclick="setFilter('partial', this)">Partial (<span id="c_partial">0</span>)</div>
+      <div class="pill" onclick="setFilter('checked', this)">Checked In (<span id="c_checked">0</span>)</div>
+      <div class="pill" onclick="setFilter('unpaid', this)">Unpaid (<span id="c_unpaid">0</span>)</div>
+      <div class="pill" onclick="setFilter('canceled', this)">Canceled (<span id="c_canceled">0</span>)</div>
+    </div>
+
+    <div id="directoryList">
+      <div class="empty-state">
+        <div class="spinner"></div><br>
+        Loading guest list...
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Check-In Modal / Bottom Sheet -->
+  <div class="overlay" id="overlay" onclick="closeModal()"></div>
+  <div class="card" id="checkinCard">
+    
+    <div class="cancel-banner" id="cancelBanner">
+      <h3>⛔ TICKET CANCELED / STRIKETHROUGH</h3>
+      <p>This registration has been canceled. <strong>DO NOT ADMIT.</strong></p>
+    </div>
+
+    <div id="badgeContainer" style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;"></div>
+    <div class="attendee-name" id="cardName">--</div>
+    <div class="ticket-code" id="cardCode">--</div>
+
+    <!-- Stepper 1: Adults -->
+    <div class="stepper-row">
+      <div class="stepper-info">
+        <div class="label">Adults (> 10y)</div>
+        <div class="sub" id="adultsQuota">Remaining: 0 / 0</div>
+      </div>
+      <div class="stepper-controls">
+        <button class="btn-step" id="btnMinusAdult" onclick="adjustCount('adult', -1)">-</button>
+        <span class="step-val" id="valAdult">0</span>
+        <button class="btn-step" id="btnPlusAdult" onclick="adjustCount('adult', 1)">+</button>
+      </div>
+    </div>
+
+    <!-- Stepper 2: Children -->
+    <div class="stepper-row">
+      <div class="stepper-info">
+        <div class="label">Children (3–10y)</div>
+        <div class="sub" id="childQuota">Remaining: 0 / 0</div>
+      </div>
+      <div class="stepper-controls">
+        <button class="btn-step" id="btnMinusChild" onclick="adjustCount('child', -1)">-</button>
+        <span class="step-val" id="valChild">0</span>
+        <button class="btn-step" id="btnPlusChild" onclick="adjustCount('child', 1)">+</button>
+      </div>
+    </div>
+
+    <!-- Stepper 3: Infants -->
+    <div class="stepper-row">
+      <div class="stepper-info">
+        <div class="label">Infants (< 3y)</div>
+        <div class="sub" id="infantQuota">Remaining: 0 / 0</div>
+      </div>
+      <div class="stepper-controls">
+        <button class="btn-step" id="btnMinusInfant" onclick="adjustCount('infant', -1)">-</button>
+        <span class="step-val" id="valInfant">0</span>
+        <button class="btn-step" id="btnPlusInfant" onclick="adjustCount('infant', 1)">+</button>
+      </div>
+    </div>
+
+    <button class="btn-submit" id="btnConfirm" onclick="submitCheckIn()">CONFIRM ENTRY</button>
+    <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+  </div>
+
+  <div class="toast" id="toastMsg"></div>
+
+  <script>
+    let activeTicket = null;
+    let counts = { adult: 0, child: 0, infant: 0 };
+    let limits = { adult: 0, child: 0, infant: 0 };
+    
+    let fullDirectory = [];
+    let currentFilter = 'all';
+
+    window.onload = () => {
+      refreshStats();
+      loadDirectory();
+    };
+
+    function forceSync() {
+      showToast("Syncing latest data...", false);
+      document.getElementById('directoryList').innerHTML = `<div class="empty-state"><div class="spinner"></div><br>Syncing...</div>`;
+      refreshStats();
+      loadDirectory();
+    }
+
+    /* ---------------- GUEST DIRECTORY LOGIC ---------------- */
+    function loadDirectory() {
+      google.script.run.withSuccessHandler(res => {
+        if (res.success) {
+          fullDirectory = res.data.reverse(); // Show newest registrations first
+          updateFilterCounts();
+          filterDirectory();
+        }
+      }).withFailureHandler(err => {
+        document.getElementById('directoryList').innerHTML = `<div class="empty-state" style="color:#ef4444;">Error loading data. Please refresh.</div>`;
+      }).apiGetAttendeeDirectory();
+    }
+
+    // Calculates real-time totals for the UI pills
+    function updateFilterCounts() {
+      let cAll = 0, cPending = 0, cPartial = 0, cChecked = 0, cUnpaid = 0, cCanceled = 0;
+      
+      fullDirectory.forEach(item => {
+        cAll++;
+        if (item.isCanceled) {
+          cCanceled++;
+        } else {
+          if (!item.isPaid) cUnpaid++;
+          
+          const totalCheckedIn = item.checkedAdults + item.checkedChildren + item.checkedInfants;
+          if (item.remTotal === 0) {
+            cChecked++;
+          } else if (totalCheckedIn > 0) {
+            cPartial++;
+          } else {
+            cPending++;
+          }
+        }
+      });
+
+      document.getElementById('c_all').innerText = cAll;
+      document.getElementById('c_pending').innerText = cPending;
+      document.getElementById('c_partial').innerText = cPartial;
+      document.getElementById('c_checked').innerText = cChecked;
+      document.getElementById('c_unpaid').innerText = cUnpaid;
+      document.getElementById('c_canceled').innerText = cCanceled;
+    }
+
+    function setFilter(filterType, elem) {
+      currentFilter = filterType;
+      document.querySelectorAll('.filter-pills .pill').forEach(p => p.classList.remove('active'));
+      elem.classList.add('active');
+      filterDirectory();
+    }
+
+    function filterDirectory() {
+      const q = document.getElementById('dirSearch').value.trim().toLowerCase();
+      const listContainer = document.getElementById('directoryList');
+
+      const filtered = fullDirectory.filter(item => {
+        // Query match
+        const matchesQuery = item.name.toLowerCase().includes(q) || item.ticketCode.toLowerCase().includes(q);
+        if (!matchesQuery) return false;
+
+        const totalCheckedIn = item.checkedAdults + item.checkedChildren + item.checkedInfants;
+
+        // Filter match
+        if (currentFilter === 'unpaid') return !item.isPaid && !item.isCanceled;
+        if (currentFilter === 'canceled') return item.isCanceled;
+        if (currentFilter === 'checked') return item.remTotal === 0 && !item.isCanceled;
+        if (currentFilter === 'partial') return item.remTotal > 0 && totalCheckedIn > 0 && !item.isCanceled;
+        if (currentFilter === 'not_checked') return totalCheckedIn === 0 && !item.isCanceled;
+        return true; // 'all'
+      });
+
+      if (filtered.length === 0) {
+        listContainer.innerHTML = `<div class="empty-state">No matching guests found.</div>`;
+        return;
+      }
+
+      let html = '';
+      filtered.forEach(item => {
+        const totalCheckedIn = item.checkedAdults + item.checkedChildren + item.checkedInfants;
+        let statusBadge = '';
+        
+        if (item.isCanceled) {
+          statusBadge = '<span class="badge badge-canceled">Canceled</span>';
+        } else if (!item.isPaid) {
+          statusBadge = '<span class="badge badge-unpaid">Unpaid</span>';
+        } else if (item.remTotal === 0) {
+          statusBadge = '<span class="badge badge-checked">In</span>';
+        } else if (totalCheckedIn > 0) {
+          statusBadge = '<span class="badge badge-partial">Partial</span>';
+        } else {
+          statusBadge = '<span class="badge badge-paid">Paid</span>';
+        }
+
+        html += `
+          <div class="guest-card ${item.isCanceled ? 'canceled-card' : ''}" onclick="lookupTicket('${item.ticketCode}')">
+            <div class="guest-main">
+              <div class="guest-name">${item.name}</div>
+              <div class="guest-code">${item.ticketCode}</div>
+              <div class="guest-breakdown">
+                <span>Ad: ${item.checkedAdults}/${item.totalAdults}</span>
+                <span>Ch: ${item.checkedChildren}/${item.totalChildren}</span>
+                <span>In: ${item.checkedInfants}/${item.totalInfants}</span>
+              </div>
+            </div>
+            <div class="guest-meta">
+              ${statusBadge}
+            </div>
+          </div>
+        `;
+      });
+
+      listContainer.innerHTML = html;
+    }
+
+    /* ---------------- VERIFICATION & MODAL ---------------- */
+    function lookupTicket(code) {
+      showToast("Fetching ticket...", false);
+      google.script.run
+        .withSuccessHandler(renderVerification)
+        .withFailureHandler(err => {
+          showToast(err.message, true);
+        })
+        .apiVerifyTicket(code);
+    }
+
+    function renderVerification(res) {
+      if (!res.success) {
+        playErrorBuzzer();
+        triggerVibration([300, 100, 300]);
+        showToast(res.message, true);
+        return;
+      }
+
+      activeTicket = res.data;
+      const isCanceled = res.isCanceled;
+
+      limits.adult = activeTicket.remAdults;
+      limits.child = activeTicket.remChildren;
+      limits.infant = activeTicket.remInfants;
+
+      counts.adult = isCanceled ? 0 : limits.adult;
+      counts.child = isCanceled ? 0 : limits.child;
+      counts.infant = isCanceled ? 0 : limits.infant;
+
+      document.getElementById("cardName").innerText = activeTicket.name;
+      document.getElementById("cardCode").innerText = activeTicket.ticketCode;
+
+      // Badges
+      let badgesHtml = '';
+      if (isCanceled) {
+        badgesHtml += '<span class="badge badge-canceled">⛔ CANCELED</span> ';
+      } else if (!activeTicket.isPaid) {
+        badgesHtml += '<span class="badge badge-unpaid">⚠️ Not Paid</span> ';
+      } else {
+        badgesHtml += '<span class="badge badge-paid">✓ Paid</span> ';
+      }
+
+      if (res.isFullyCheckedIn) {
+        badgesHtml += '<span class="badge badge-checked">Fully Checked In</span>';
+      } else if (activeTicket.gateStatus && activeTicket.gateStatus.includes("Partial")) {
+        badgesHtml += '<span class="badge badge-partial">Partially In</span>';
+      }
+      
+      document.getElementById("badgeContainer").innerHTML = badgesHtml;
+
+      document.getElementById("adultsQuota").innerText = `Remaining: ${limits.adult} / ${activeTicket.totalAdults}`;
+      document.getElementById("childQuota").innerText = `Remaining: ${limits.child} / ${activeTicket.totalChildren}`;
+      document.getElementById("infantQuota").innerText = `Remaining: ${limits.infant} / ${activeTicket.totalInfants}`;
+
+      const card = document.getElementById("checkinCard");
+      const cancelBanner = document.getElementById("cancelBanner");
+      const confirmBtn = document.getElementById("btnConfirm");
+
+      if (isCanceled) {
+        playErrorBuzzer();
+        triggerVibration([400, 100, 400]);
+        showToast("ENTRY DENIED: Ticket is CANCELED", true);
+
+        cancelBanner.style.display = "block";
+        card.style.borderTop = "4px solid #ef4444";
+
+        setSteppersDisabled(true);
+        confirmBtn.disabled = true;
+        confirmBtn.className = "btn-submit btn-denied";
+        confirmBtn.innerText = "ENTRY DENIED (CANCELED)";
+      } else {
+        playSuccessBeep();
+        triggerVibration(100);
+
+        cancelBanner.style.display = "none";
+        card.style.borderTop = "3px solid #38bdf8";
+
+        setSteppersDisabled(false);
+        confirmBtn.className = "btn-submit";
+        updateStepperUI();
+      }
+
+      document.getElementById("overlay").style.display = "block";
+      card.style.display = "block";
+      
+      // Blur search input to hide keyboard on mobile
+      document.getElementById("dirSearch").blur();
+    }
+
+    function setSteppersDisabled(disabled) {
+      document.getElementById("btnMinusAdult").disabled = disabled;
+      document.getElementById("btnPlusAdult").disabled = disabled;
+      document.getElementById("btnMinusChild").disabled = disabled;
+      document.getElementById("btnPlusChild").disabled = disabled;
+      document.getElementById("btnMinusInfant").disabled = disabled;
+      document.getElementById("btnPlusInfant").disabled = disabled;
+      document.getElementById("valAdult").innerText = counts.adult;
+      document.getElementById("valChild").innerText = counts.child;
+      document.getElementById("valInfant").innerText = counts.infant;
+    }
+
+    function adjustCount(type, delta) {
+      if (activeTicket && activeTicket.isCanceled) return;
+      const newVal = counts[type] + delta;
+      if (newVal >= 0 && newVal <= limits[type]) {
+        counts[type] = newVal;
+        updateStepperUI();
+      }
+    }
+
+    function updateStepperUI() {
+      document.getElementById("valAdult").innerText = counts.adult;
+      document.getElementById("valChild").innerText = counts.child;
+      document.getElementById("valInfant").innerText = counts.infant;
+
+      const totalSelected = counts.adult + counts.child + counts.infant;
+      const btn = document.getElementById("btnConfirm");
+      
+      if (totalSelected === 0) {
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+        btn.innerText = "SELECT AT LEAST 1 PERSON";
+      } else {
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        btn.innerText = `CONFIRM ENTRY (${totalSelected})`;
+      }
+    }
+
+    function submitCheckIn() {
+      if (activeTicket && activeTicket.isCanceled) return;
+
+      const btn = document.getElementById("btnConfirm");
+      btn.disabled = true;
+      btn.innerText = "Processing Check-in...";
+
+      const payload = {
+        ticketCode: activeTicket.ticketCode,
+        adults: counts.adult,
+        children: counts.child,
+        infants: counts.infant,
+        note: 'Gate Entry'
+      };
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.success) {
+            playSuccessBeep();
+            triggerVibration([100, 50, 100]);
+            showToast(res.message, false);
+            closeModal();
+            refreshStats();
+            loadDirectory(); // Refresh directory list live
+          } else {
+            playErrorBuzzer();
+            showToast(res.message, true);
+            btn.disabled = false;
+            updateStepperUI();
+          }
+        })
+        .withFailureHandler(err => {
+          playErrorBuzzer();
+          showToast(err.message, true);
+          btn.disabled = false;
+          updateStepperUI();
+        })
+        .apiProcessCheckIn(payload);
+    }
+
+    function closeModal() {
+      document.getElementById("overlay").style.display = "none";
+      document.getElementById("checkinCard").style.display = "none";
+    }
+
+    /* ---------------- AUDIO & HELPERS ---------------- */
+    function refreshStats() {
+      google.script.run.withSuccessHandler(stats => {
+        document.getElementById("liveStats").innerText = `Checked: ${stats.totalChecked} / ${stats.totalPaid}`;
+      }).apiGetGateStats();
+    }
+
+    function showToast(msg, isError) {
+      const t = document.getElementById("toastMsg");
+      t.innerText = msg;
+      t.className = isError ? "toast toast-err" : "toast";
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 3500);
+    }
+
+    function triggerVibration(pattern) {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    }
+
+    function playSuccessBeep() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.1);
+      } catch(e){}
+    }
+
+    function playErrorBuzzer() {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(220, ctx.currentTime);
+        osc.frequency.setValueAtTime(150, ctx.currentTime + 0.15);
+        osc.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.35);
+      } catch(e){}
+    }
+  </script>
+</body>
+</html>
