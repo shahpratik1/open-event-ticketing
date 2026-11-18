@@ -1,6 +1,6 @@
-# Event Check-In App
+# Open Event Ticketing
 
-A Google Apps Script + React-based event management and live gate check-in system built on Google Sheets.
+A production-grade Google Sheets & Apps Script-powered event ticketing, email automation, and live mobile QR gate check-in system.
 
 ## Overview
 
